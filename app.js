@@ -3,48 +3,66 @@ const axios = require('axios');
 const app = express();
 app.use(express.json());
 
+// ====== PUT YOUR REAL VALUES HERE ======
 const VERIFY_TOKEN = "mota_verify_2024";
-const PHONE_NUMBER_ID = "1334966083037170";
-// REPLACE BELOW WITH YOUR FULL EAA TOKEN FROM META PAGE
-const WHATSAPP_TOKEN = "EAASQkvA9xG4BSo2BySRHkMGLNG7kyzqO4sZAVFvJcZAUG9F6W59vH0fdr4zMXe8hVA4CPtppj0JtBr4pCoZCapONcyKb4oTuISvPiR9XBkFFudAFXKSRqu78VnhVS8Eq4Wkn9ahf3ZCzPPvNFHHCSSw6yslSZAmzy9RUrnqAySzFcSwwe7wbo0Np1GQ35ZBnpmp9bmuFUY18FqgEVebj97GCxOsuWiWZCxwS1RBn7PbuNVM608oBbne2pbvLMjR0hMvHYPuIGJZALEQokh9Ny8S6DMEO";
+// Get this from developers.facebook.com -> WhatsApp -> API Setup -> Temporary token (starts EAA...)
+const WHATSAPP_TOKEN = "EAAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+// Get this from same page -> Phone Number ID (numbers only)
+const PHONE_NUMBER_ID = "123456789012345";
 
-const MENU = `🚗 Welcome to Mota! Byo Ride!
-1️⃣ Book a Ride
-2️⃣ Check Price
-3️⃣ My Trips
-4️⃣ Support
+// ====== DO NOT CHANGE BELOW ======
+console.log("Mota starting...");
 
-Reply with number Malume!`;
-
-async function send(to, text){
-  try{
-    await axios.post(`https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,{
-      messaging_product: "whatsapp",
-      to: to,
-      text: { body: text }
-    },{ headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` } });
-  }catch(e){ console.log(e.response?.data); }
-}
-
-app.get('/', (req,res)=> res.send('Mota Live 🚗'));
-app.get('/webhook', (req,res)=>{
-  if(req.query['hub.verify_token']===VERIFY_TOKEN) res.send(req.query['hub.challenge']);
-  else res.sendStatus(403);
+app.get('/', (req, res) => {
+  console.log("Root hit");
+  res.send('Mota running - webhook at /webhook');
 });
 
-app.post('/webhook', async (req,res)=>{
-  const m = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-  if(m){
-    const from = m.from;
-    const txt = (m.text?.body||'').toLowerCase();
-    let reply = MENU;
-    if(txt.includes('hi')||txt==='1'||txt==='menu') reply = MENU;
-    else if(txt.includes('book')||txt==='1') reply = "Sharp! Where to pick you? 📍\nE.g Ascot Shops";
-    else if(txt.includes('ascot')||txt.includes('town')||txt.includes('luveve')) reply = `💰 ${m.text.body} → Town\nPrice: $3.50 ETA 8mins\nConfirm? YES`;
-    else if(txt.includes('yes')) reply = "✅ Ride confirmed! Driver Sipho - White Honda Fit ABC1234 - 5 mins!";
-    await send(from, reply);
+app.get('/webhook', (req, res) => {
+  console.log("GET /webhook:", req.query);
+  if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === VERIFY_TOKEN) {
+    console.log("✅ VERIFIED!");
+    res.status(200).send(req.query['hub.challenge']);
+  } else {
+    console.log("❌ Verify failed");
+    res.sendStatus(403);
   }
+});
+
+app.post('/webhook', async (req, res) => {
+  console.log("📩 Message received");
+  console.log(JSON.stringify(req.body, null, 2));
+
+  try {
+    const message = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+    if (message) {
+      const from = message.from;
+      const text = message.text?.body || "hi";
+      console.log(`From ${from}: ${text}`);
+
+      // Reply back on WhatsApp
+      await axios.post(
+        `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+        {
+          messaging_product: "whatsapp",
+          to: from,
+          text: { body: `Mota: I got your message "${text}" ✅` }
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${EAASQkvA9xG4BShyLHE2OmBZCeKT2SD7V09V4hw9iMrUUFHNZCxaZCkAEomvJZAADwdIaTjkE43ynib6PNDy0PqJGaexN2C059o20MgxjPZAinxWsAdiQxZCpz18vWbQlLFi697iT8FZAoHK1dWfWxXA1NvZAMb9T6ZAFFZCWMmWHHCQKcoVH0Jz2ij39p7Klp73jB4RlHEt0ZACmgEVmbZA3loFZAAgmVLV4BsHMxZAGVyrtavbb9oBnPhsKe3dvHqAhBh75w0ZCuiI1oNyWRgUsFZBHqAaYeHcs}`,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+      console.log("✅ Reply sent to", from);
+    }
+  } catch (err) {
+    console.log("❌ Reply error:", err.response?.data || err.message);
+  }
+
   res.sendStatus(200);
 });
 
-app.listen(process.env.PORT||10000, ()=> console.log('Mota running'));
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => console.log(`Mota live on ${PORT}`));
